@@ -47,15 +47,20 @@ export async function addStockToWatchlist({
 }) {
   try {
     const session = await auth();
-    const userId = session?.user?.id;
+
+    const user = await prisma.user.findFirst({
+      where: { email: session?.user?.email },
+    });
+    const userId = user?.id;
+
     if (!userId) {
       throw new Error("User not found");
     }
-    //   const watchListType = watchlistType === "portfolio" ? "PORTFOLIO" : "GENERAL";
+
     const watchlist = await prisma.watchlist.findFirst({
       where: { userId, watchListType: watchlistType },
     });
-    console.log(watchlist);
+
     if (!watchlist) {
       createDefaultWatchlists();
     }
@@ -87,15 +92,20 @@ export async function addStockToWatchlist({
       success: true,
       message: "Stock added to watchlist",
     };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
-      message: "Error adding stock to watchlist",
+      message: error.message,
     };
   }
 }
 
 export async function getStocksInWatchlist(watchlistId: string) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) {
+    throw new Error("User not found");
+  }
   return await prisma.stock.findMany({
     where: { watchlistId },
   });

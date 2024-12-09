@@ -1,6 +1,6 @@
 "use client";
 
-import { removeStock } from "@/app/actions";
+import { removeStock } from "@/app/actions/actions";
 import { Button } from "../ui/button";
 import { useToast } from "@/hooks/use-toast";
 

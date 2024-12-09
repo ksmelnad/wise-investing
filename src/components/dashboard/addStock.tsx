@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { addStockToWatchlist } from "@/app/actions";
+import { addStockToWatchlist } from "@/app/actions/actions";
 import { useToast } from "@/hooks/use-toast";
 
 interface Stock {
@@ -50,7 +50,7 @@ const AddStock = () => {
       const data = response.data;
       const { stock } = data;
       setStockData(stock);
-      console.log(data);
+      // console.log(data);
     } catch (error) {
       console.error("Error fetching stock data:", error);
     }

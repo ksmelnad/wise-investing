@@ -29,9 +29,7 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
-// import { getStockData } from "@/app/actions";
 import yahooFinance from "yahoo-finance2";
-import { getStockData, removeStock } from "@/app/actions";
 import AddStock from "./dashboard/addStock";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
@@ -47,6 +45,7 @@ const Watchlist = async () => {
       stocks: true,
     },
   });
+
   // console.log("My stocks", myWatchlists);
 
   const portfolioStocks = myWatchlists.filter(
@@ -56,6 +55,14 @@ const Watchlist = async () => {
   const generalStocks = myWatchlists.filter(
     (watchlist) => watchlist.watchListType === "general"
   )[0]?.stocks;
+
+  // const portfolioStockData = await subscribeToWatchlist(portfolioStocks);
+  // const generalStockData = await subscribeToWatchlist(generalStocks);
+  // console.log("Portfolio stocks", portfolioStockData);
+  // console.log("General stocks", generalStockData);
+
+  // unsubscribeFromWatchlist(portfolioStocks);
+  // unsubscribeFromWatchlist(generalStocks);
 
   const currentPricesGeneralStocks = await Promise.all(
     generalStocks.map(async (stock) => {
@@ -71,6 +78,8 @@ const Watchlist = async () => {
         return; // or throw an error, depending on your requirements
       }
       stock.currentPrice = quote.regularMarketPrice!;
+      stock.change = quote.regularMarketChange!;
+      stock.changePercent = quote.regularMarketChangePercent!;
 
       // return quote;
     })
@@ -93,7 +102,18 @@ const Watchlist = async () => {
     })
   );
 
-  // console.log("CURRENT PRICES", currentPricesGeneralStocks);
+  const calculateChangePercent = (
+    purchasePrice: number,
+    currentPrice: number
+  ) => {
+    const change = ((currentPrice - purchasePrice) / purchasePrice) * 100;
+    return change.toFixed(2);
+  };
+
+  const calculateChange = (purchasePrice: number, currentPrice: number) => {
+    const change = currentPrice - purchasePrice;
+    return Number(change.toFixed(2));
+  };
 
   return (
     <section className="max-w-5xl mx-auto ">
@@ -117,6 +137,7 @@ const Watchlist = async () => {
                   </TableHead>
                   <TableHead className="font-bold p-2">Current Price</TableHead>
                   <TableHead className="font-bold p-2">Change</TableHead>
+                  <TableHead className="font-bold p-2">Change %</TableHead>
                   <TableHead className="font-bold p-2">Edit</TableHead>
                 </TableRow>
               </TableHeader>
@@ -129,16 +150,28 @@ const Watchlist = async () => {
                       ${stock.purchasePrice}
                     </TableCell>
                     <TableCell className="p-2">${stock.currentPrice}</TableCell>
-                    {/* <TableCell
-                        className={`p-2 ${
-                          stock.change.startsWith("+")
-                            ? "text-green-500"
-                            : "text-red-500"
-                        }`}
-                      >
-                        {stock.change}
-                      </TableCell> */}
-                    <TableCell className="p-2">Change</TableCell>
+                    <TableCell
+                      className={`p-2 ${
+                        calculateChange(
+                          stock.purchasePrice as number,
+                          stock.currentPrice as number
+                        ) < 0
+                          ? "text-red-600"
+                          : "text-green-600"
+                      }`}
+                    >
+                      {calculateChange(
+                        stock.purchasePrice as number,
+                        stock.currentPrice as number
+                      )}
+                    </TableCell>
+                    <TableCell className="p-2">
+                      {calculateChangePercent(
+                        stock.purchasePrice as number,
+                        stock.currentPrice as number
+                      )}
+                    </TableCell>
+
                     <TableCell className="p-2 flex items-center gap-2 ">
                       <Edit size={16} color="purple" />
                       <Dialog>
@@ -175,7 +208,7 @@ const Watchlist = async () => {
           </CardContent>
           <CardFooter className="flex flex-col"></CardFooter>
         </Card>
-        <Card>
+        <Card className="mt-4">
           <CardHeader>
             <h3 className="text-lg font-semibold">General Watchlist</h3>
             <p className="text-sm">Your general stocks and their performance</p>
@@ -189,6 +222,7 @@ const Watchlist = async () => {
 
                   <TableHead className="font-bold p-2">Current Price</TableHead>
                   <TableHead className="font-bold p-2">Change</TableHead>
+                  <TableHead className="font-bold p-2">Change %</TableHead>
                   <TableHead className="font-bold p-2">Edit</TableHead>
                 </TableRow>
               </TableHeader>
@@ -201,16 +235,33 @@ const Watchlist = async () => {
                     <TableCell className="p-2">
                       ${stock.currentPrice?.toFixed(2)}
                     </TableCell>
-                    {/* <TableCell
-                      className={`p-2 ${
-                        stock.change.startsWith("+")
-                          ? "text-green-500"
-                          : "text-red-500"
-                      }`}
+
+                    <TableCell
+                      className={`p-2 
+                      ${
+                        stock.change
+                          ? stock.change < 0
+                            ? "text-red-600"
+                            : "text-green-600"
+                          : ""
+                      }
+                    `}
                     >
-                      {stock.change}
-                    </TableCell> */}
-                    <TableCell className="p-2">Change</TableCell>
+                      {stock.change?.toFixed(2)}
+                    </TableCell>
+                    <TableCell
+                      className={`p-2 
+                      ${
+                        stock.changePercent
+                          ? stock.changePercent < 0
+                            ? "text-red-600"
+                            : "text-green-600"
+                          : ""
+                      }
+                    `}
+                    >
+                      {stock.changePercent?.toFixed(2)}
+                    </TableCell>
                     <TableCell className="p-2 ">
                       <Dialog>
                         <DialogTrigger>

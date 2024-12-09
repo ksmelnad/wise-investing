@@ -88,6 +88,8 @@ model Stock {
   name          String
   purchasePrice Float? // Optional for general watchlist
   currentPrice  Float?
+  change        Float?
+  changePercent Float?
 }
 
 
