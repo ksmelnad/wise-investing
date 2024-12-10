@@ -55,7 +55,7 @@ const page = async () => {
     portfolioStocks.map(async (stock) => {
       // const fields = ["regularMarketPrice", "regularMarketTime"] as const;
       const quote = await yahooFinance.quoteCombine(stock.symbol);
-      console.log(quote);
+      //   console.log(quote);
       // Populate generalStocks's current price with quote's regularMarketPrice
       if (!quote) {
         console.error(`Error fetching quote for ${stock.symbol}`);

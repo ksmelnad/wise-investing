@@ -14,7 +14,7 @@ export default async function Layout({
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <DashboardSidebar />
-      <main className=" bg-sidebar">
+      <main className="w-full bg-sidebar">
         <Navbar title="Dashboard" />
         <div className="p-4">{children}</div>
       </main>
