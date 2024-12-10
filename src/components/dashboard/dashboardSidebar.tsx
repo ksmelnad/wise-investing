@@ -9,6 +9,7 @@ import {
   ChevronUp,
   List,
   Sigma,
+  Command,
 } from "lucide-react";
 
 import {
@@ -21,6 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  SidebarHeader,
 } from "@/components/ui/sidebar";
 
 import {
@@ -32,28 +34,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import SignOut from "../signOut";
+import Link from "next/link";
 
 // Menu items.
 const items = [
   {
     title: "Watchlists",
-    url: "#",
+    url: "/dashboard/watchlists",
     icon: List,
   },
 
   {
     title: "Algorithms",
-    url: "#",
+    url: "/dashboard/algorithms",
     icon: Sigma,
   },
   {
-    title: "Settings",
-    url: "#",
-    icon: Settings,
-  },
-  {
-    title: "Profile ",
-    url: "#",
+    title: "Account",
+    url: "/dashboard/account",
     icon: User2,
   },
 ];
@@ -63,9 +61,24 @@ export async function DashboardSidebar() {
   if (!session?.user) return null;
   return (
     <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link href="/dashboard">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                  <Command className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">Wise Investing</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Wise Investing</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (

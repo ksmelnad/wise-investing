@@ -90,6 +90,14 @@ model Stock {
   currentPrice  Float?
   change        Float?
   changePercent Float?
+  fiftyDayAverage Float?
+  fiftyDayAverageChange Float?
+  fiftyDayAverageChangePercent Float?
+  twoHundredDayAverage Float?
+  twoHundredDayAverageChange Float?
+  twoHundredDayAverageChangePercent Float?
+
+
 }
 
 

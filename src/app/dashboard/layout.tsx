@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "@/components/dashboard/dashboardSidebar";
+import Navbar from "@/components/dashboard/navbar";
 
 export default async function Layout({
   children,
@@ -13,9 +14,9 @@ export default async function Layout({
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <DashboardSidebar />
-      <main>
-        <SidebarTrigger />
-        <div className="max-w-5xl mx-auto">{children}</div>
+      <main className=" bg-sidebar">
+        <Navbar title="Dashboard" />
+        <div className="p-4">{children}</div>
       </main>
     </SidebarProvider>
   );
