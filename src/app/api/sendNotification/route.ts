@@ -7,10 +7,12 @@ import PortfolioWatchlist from "@/components/portfolioWatchlist";
 import { getStocks } from "@/app/actions/actions";
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
 
 const bot = new TelegramBot(process.env.TELEGRAM_API_TOKEN!);
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
+  const authorization = (await headers()).get("authorization");
   const authToken = request.headers.get("authorization");
   if (!authToken || authToken !== `Bearer ${process.env.CRON_JOB_API_KEY}`) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
