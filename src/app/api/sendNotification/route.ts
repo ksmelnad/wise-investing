@@ -12,8 +12,9 @@ import { headers } from "next/headers";
 const bot = new TelegramBot(process.env.TELEGRAM_API_TOKEN!);
 
 export async function GET(request: Request) {
-  const authorization = (await headers()).get("authorization");
-  const authToken = request.headers.get("authorization");
+  const authToken = (await headers()).get("authorization");
+  //   const authToken = request.headers.get("authorization");
+  console.log("AuthToken", authToken);
   if (!authToken || authToken !== `Bearer ${process.env.CRON_JOB_API_KEY}`) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
