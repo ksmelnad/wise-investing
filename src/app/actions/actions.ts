@@ -8,11 +8,16 @@ import { revalidatePath } from "next/cache";
 
 export async function createDefaultWatchlists() {
   const session = await auth();
-  const userId = session?.user?.id;
-  console.log(userId);
-  if (!userId) {
+  const userEmail = session?.user?.email;
+  const user = await prisma.user.findFirst({
+    where: { email: userEmail },
+  });
+
+  if (!user) {
     throw new Error("User not found");
   }
+  const userId = user.id;
+
   const result = await prisma.watchlist.createMany({
     data: [
       { userId, watchListType: "general" },
@@ -25,12 +30,16 @@ export async function createDefaultWatchlists() {
 
 export async function getWatchlist() {
   const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) {
+  const userEmail = session?.user?.email;
+  const user = await prisma.user.findFirst({
+    where: { email: userEmail },
+  });
+
+  if (!user) {
     throw new Error("User not found");
   }
   return await prisma.watchlist.findMany({
-    where: { userId },
+    where: { userId: user.id },
   });
 }
 
@@ -109,6 +118,38 @@ export async function getStocksInWatchlist(watchlistId: string) {
   return await prisma.stock.findMany({
     where: { watchlistId },
   });
+}
+
+export async function getStocks() {
+  const session = await auth();
+  const userEmail = session?.user?.email;
+  const user = await prisma.user.findFirst({
+    where: { email: userEmail },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const myWatchlists = await prisma.watchlist.findMany({
+    where: { userId: user.id },
+    include: {
+      stocks: true,
+    },
+  });
+
+  const portfolioStocks = myWatchlists.filter(
+    (watchlist) => watchlist.watchListType === "portfolio"
+  )[0]?.stocks;
+
+  const generalStocks = myWatchlists.filter(
+    (watchlist) => watchlist.watchListType === "general"
+  )[0]?.stocks;
+
+  return {
+    portfolioStocks,
+    generalStocks,
+  };
 }
 
 export async function updateStock({

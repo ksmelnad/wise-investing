@@ -1,0 +1,61 @@
+import TelegramBot from "node-telegram-bot-api";
+import { prisma } from "@/lib/prisma";
+
+export const bot = new TelegramBot(process.env.TELEGRAM_API_TOKEN!, {
+  polling: true,
+});
+
+// Handle /start command
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(
+    chatId,
+    "Welcome to Wise Investing! Please register by using /register <your-email>"
+  );
+});
+
+// Handle /register command
+bot.onText(/\/register (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+
+  let email = "";
+
+  if (match && match[1]) {
+    email = match[1].trim();
+  } else {
+    bot.sendMessage(
+      chatId,
+      "Invalid command format. Please use /register <your-email>"
+    );
+    return;
+  }
+
+  try {
+    // Check if the email exists in the database
+    const user = await prisma.user.findUnique({
+      where: {
+        email: email,
+      },
+    });
+
+    if (user) {
+      // Update the chatId for the user
+      await prisma.user.update({
+        where: { email },
+        data: { telegramChatId: chatId.toString() },
+      });
+
+      bot.sendMessage(chatId, `Hi ${user.name}, your Telegram is now linked!`);
+    } else {
+      bot.sendMessage(
+        chatId,
+        "This email is not registered with us. Please register on our website first."
+      );
+    }
+  } catch (error) {
+    console.error("Error handling /register:", error);
+    bot.sendMessage(chatId, "An error occurred. Please try again later.");
+  }
+});
+
+// bot.setWebHook(`https://wise-investing.vercel.app/api/webhook/telegram`);

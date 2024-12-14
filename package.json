@@ -30,6 +30,7 @@
     "lucide-react": "^0.462.0",
     "next": "15.0.3",
     "next-auth": "5.0.0-beta.25",
+    "node-telegram-bot-api": "^0.66.0",
     "react": "19.0.0-rc-66855b96-20241106",
     "react-dom": "19.0.0-rc-66855b96-20241106",
     "react-hook-form": "^7.53.2",
@@ -42,6 +43,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
+    "@types/node-telegram-bot-api": "^0.64.7",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.5.13",

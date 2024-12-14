@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getStocks } from "@/app/actions/actions";
 
 const algos = [
   {
@@ -34,28 +35,13 @@ const algos = [
 const page = async () => {
   const session = await auth();
 
-  const myWatchlists = await prisma.watchlist.findMany({
-    where: { userId: session?.user?.id },
-    include: {
-      stocks: true,
-    },
-  });
+  const { portfolioStocks, generalStocks } = await getStocks();
 
-  // console.log("My stocks", myWatchlists);
-
-  const portfolioStocks = myWatchlists.filter(
-    (watchlist) => watchlist.watchListType === "portfolio"
-  )[0]?.stocks;
-
-  const generalStocks = myWatchlists.filter(
-    (watchlist) => watchlist.watchListType === "general"
-  )[0]?.stocks;
-
-  const currentPricesGeneralStocks = await Promise.all(
+  const currentPricesPortfolioStocks = await Promise.all(
     portfolioStocks.map(async (stock) => {
       // const fields = ["regularMarketPrice", "regularMarketTime"] as const;
       const quote = await yahooFinance.quoteCombine(stock.symbol);
-      //   console.log(quote);
+      // console.log(quote);
       // Populate generalStocks's current price with quote's regularMarketPrice
       if (!quote) {
         console.error(`Error fetching quote for ${stock.symbol}`);
@@ -77,23 +63,6 @@ const page = async () => {
         quote.twoHundredDayAverageChangePercent!;
 
       // return quote;
-    })
-  );
-
-  const currentPricesPortfolioStocks = await Promise.all(
-    portfolioStocks.map(async (stock) => {
-      // const fields = ["regularMarketPrice", "regularMarketTime"] as const;
-      const quote = await yahooFinance.quoteCombine(stock.symbol);
-      if (!quote) {
-        console.error(`Error fetching quote for ${stock.symbol}`);
-        return; // or throw an error, depending on your requirements
-      }
-      if (!quote.regularMarketPrice) {
-        console.error(`Missing regularMarketPrice field for ${stock.symbol}`);
-        return; // or throw an error, depending on your requirements
-      }
-
-      stock.currentPrice = quote.regularMarketPrice!;
     })
   );
 
