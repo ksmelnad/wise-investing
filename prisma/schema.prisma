@@ -97,8 +97,6 @@ model Stock {
   twoHundredDayAverage Float?
   twoHundredDayAverageChange Float?
   twoHundredDayAverageChangePercent Float?
-
-
 }
 
 

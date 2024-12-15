@@ -46,16 +46,6 @@ export async function GET(request: Request) {
           return; // or throw an error, depending on your requirements
         }
         stock.currentPrice = quote.regularMarketPrice!;
-        stock.change = quote.regularMarketChange!;
-        stock.changePercent = quote.regularMarketChangePercent!;
-        stock.fiftyDayAverage = quote.fiftyDayAverage!;
-        stock.fiftyDayAverageChange = quote.fiftyDayAverageChange!;
-        stock.fiftyDayAverageChangePercent =
-          quote.fiftyDayAverageChangePercent!;
-        stock.twoHundredDayAverage = quote.twoHundredDayAverage!;
-        stock.twoHundredDayAverageChange = quote.twoHundredDayAverageChange!;
-        stock.twoHundredDayAverageChangePercent =
-          quote.twoHundredDayAverageChangePercent!;
 
         // return quote;
       })
@@ -70,7 +60,7 @@ export async function GET(request: Request) {
 
       // Check if the change exceeds ±3%
       if (Math.abs(changePercent) >= 3) {
-        const message = `==========/n
+        const message = `==========\n
 📈 ${stock.symbol} Alert:
 - Purchase Price: $${purchasePrice?.toFixed(2)}
 - Current Price: $${currentPrice?.toFixed(2)}

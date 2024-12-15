@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import TelegramBot from "node-telegram-bot-api";
 import { prisma } from "@/lib/prisma";
-import yahooFinance from "yahoo-finance2";
+import axios from "axios";
 
 export async function GET() {
   return new NextResponse("Welcome to Wise Investing Telegram Webhook", {
@@ -13,12 +13,26 @@ const bot = new TelegramBot(process.env.TELEGRAM_API_TOKEN!);
 
 bot.setWebHook(process.env.TELEGRAM_WEBHOOK_URL!);
 
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(
-    chatId,
-    "Welcome to Wise Investing Guru! Please register by using /register <your-email>"
-  );
+
+  const user = await prisma.user.findUnique({
+    where: {
+      telegramChatId: chatId.toString(),
+    },
+  });
+
+  if (user) {
+    bot.sendMessage(
+      chatId,
+      `Hi ${user.name}, welcome back to Wise Investing Bot!`
+    );
+  } else {
+    bot.sendMessage(
+      chatId,
+      "Welcome to Wise Investing Bot! Please register by using /register <your-email>"
+    );
+  }
 });
 
 bot.onText(/\/register (.+)/, async (msg, match) => {
@@ -46,12 +60,22 @@ bot.onText(/\/register (.+)/, async (msg, match) => {
 
     if (user) {
       // Update the chatId for the user
-      await prisma.user.update({
-        where: { email },
-        data: { telegramChatId: chatId.toString() },
-      });
+      if (!user.telegramChatId) {
+        await prisma.user.update({
+          where: { email },
+          data: { telegramChatId: chatId.toString() },
+        });
 
-      bot.sendMessage(chatId, `Hi ${user.name}, your Telegram is now linked!`);
+        bot.sendMessage(
+          chatId,
+          `Hi ${user.name}, your Telegram is now linked!`
+        );
+      } else {
+        bot.sendMessage(
+          chatId,
+          `Hi ${user.name}, your Telegram is already linked!`
+        );
+      }
     } else {
       bot.sendMessage(
         chatId,
@@ -80,22 +104,22 @@ bot.onText(/\/stock (.+)/, async (msg, match) => {
   const ticker = stock.toUpperCase();
   try {
     // Fetch stock data using Yahoo Finance API
-    const stockData = await yahooFinance.quote(ticker);
+    // const stockData = await yahooFinance.quote(ticker);
+    const response = await axios.get(
+      `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${process.env.FINNHUB_API_KEY}`
+    );
+    const stockData = await response.data;
     // console.log(stockData);
 
-    if (stockData && stockData.regularMarketPrice) {
-      const price = stockData.regularMarketPrice;
-      const changePercent = stockData.regularMarketChangePercent?.toFixed(2);
-      const marketCap = stockData.marketCap
-        ? `$${(stockData.marketCap / 1e9).toFixed(2)}B`
-        : "N/A";
+    if (stockData && stockData.c) {
+      const price = stockData.c;
+      const changePercent = stockData.dp.toFixed(2);
 
       bot.sendMessage(
         chatId,
         `📈 ${ticker} Stock Price:\n` +
           `- Current Price: $${price}\n` +
-          `- Change: ${changePercent}%\n` +
-          `- Market Cap: ${marketCap}`
+          `- Change: ${changePercent}%\n`
       );
     } else {
       bot.sendMessage(
