@@ -12,7 +12,7 @@ export async function GET() {
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
 
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.findFirst({
     where: {
       telegramChatId: chatId.toString(),
     },
