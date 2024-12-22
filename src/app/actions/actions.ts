@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { type Watchlist as WatchlistPrismaType } from "@prisma/client";
 import yahooFinance from "yahoo-finance2";
 
 import { auth } from "@/auth";
@@ -8,6 +9,7 @@ import { revalidatePath } from "next/cache";
 
 export async function createDefaultWatchlists() {
   const session = await auth();
+
   const userEmail = session?.user?.email;
   const user = await prisma.user.findFirst({
     where: { email: userEmail },
@@ -56,6 +58,7 @@ export async function addStockToWatchlist({
 }) {
   try {
     const session = await auth();
+    console.log("Session in addStock:", session);
 
     const user = await prisma.user.findFirst({
       where: { email: session?.user?.email },
@@ -95,7 +98,7 @@ export async function addStockToWatchlist({
       });
     }
 
-    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/watchlists");
 
     return {
       success: true,
@@ -139,11 +142,11 @@ export async function getStocks() {
   });
 
   const portfolioStocks = myWatchlists.filter(
-    (watchlist) => watchlist.watchListType === "portfolio"
+    (watchlist: WatchlistPrismaType) => watchlist.watchListType === "portfolio"
   )[0]?.stocks;
 
   const generalStocks = myWatchlists.filter(
-    (watchlist) => watchlist.watchListType === "general"
+    (watchlist: WatchlistPrismaType) => watchlist.watchListType === "general"
   )[0]?.stocks;
 
   return {

@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import SignOut from "../signOut";
 import Link from "next/link";
+import { SheetTitle } from "../ui/sheet";
 
 // Menu items.
 const items = [

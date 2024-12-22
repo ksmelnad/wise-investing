@@ -36,7 +36,8 @@ const AddStock = () => {
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [selectedWatchlist, setSelectedWatchlist] = useState<string>("general");
   const [selectedStockPurchasePrice, setSelectedStockPurchasePrice] =
-    useState<number>(0.0);
+    useState<string>("");
+  const [purchasePriceError, setPurchasePriceError] = useState<string>("");
 
   const { toast } = useToast();
 
@@ -61,14 +62,21 @@ const AddStock = () => {
   //   console.log(results);
   // };
 
-  const handleAddStock = async () => {
+  const handleAddStock = async (event: React.FormEvent) => {
+    event.preventDefault();
+
     if (selectedStock) {
       try {
+        if (isNaN(Number(selectedStockPurchasePrice))) {
+          setPurchasePriceError("Purchase price must be a number");
+          return;
+        }
+        setPurchasePriceError("");
         const response = await addStockToWatchlist({
           symbol: selectedStock.symbol,
           name: selectedStock.name,
           watchlistType: selectedWatchlist,
-          purchasePrice: selectedStockPurchasePrice,
+          purchasePrice: Number(selectedStockPurchasePrice),
         });
 
         if (response.success === true) {
@@ -158,27 +166,27 @@ const AddStock = () => {
                             </Label>
                             <Input
                               id="purchasePrice"
-                              type="number"
-                              step="0.01"
+                              // type="number"
+                              // step="0.01"
                               value={selectedStockPurchasePrice}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                if (value === "" || isNaN(parseFloat(value))) {
-                                  setSelectedStockPurchasePrice(0.0); // Or set it to 0, depending on your needs
-                                } else {
-                                  setSelectedStockPurchasePrice(
-                                    parseFloat(value)
-                                  );
-                                }
-                              }}
+                              onChange={(e) =>
+                                setSelectedStockPurchasePrice(e.target.value)
+                              }
                               placeholder="Purchase Price"
                             />
+                            {purchasePriceError && (
+                              <p className="text-red-500">
+                                {purchasePriceError}
+                              </p>
+                            )}
                           </div>
                         )}
 
                         <DialogFooter className="sm:justify-start">
                           <DialogClose asChild>
-                            <Button onClick={handleAddStock}>Add</Button>
+                            <Button onClick={(e) => handleAddStock(e)}>
+                              Add
+                            </Button>
                           </DialogClose>
                           <DialogClose asChild>
                             <Button variant="secondary">Close</Button>

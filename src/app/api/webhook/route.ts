@@ -1,17 +1,13 @@
 import { NextResponse } from "next/server";
-import TelegramBot from "node-telegram-bot-api";
 import { prisma } from "@/lib/prisma";
 import axios from "axios";
+import bot from "@/utils/tgBot";
 
 export async function GET() {
   return new NextResponse("Welcome to Wise Investing Telegram Webhook", {
     status: 200,
   });
 }
-
-const bot = new TelegramBot(process.env.TELEGRAM_API_TOKEN!);
-
-bot.setWebHook(process.env.TELEGRAM_WEBHOOK_URL!);
 
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;

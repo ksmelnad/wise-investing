@@ -35,31 +35,10 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { Edit, Trash } from "lucide-react";
 import DelStockBtn from "./dashboard/delStockBtn";
+import { getStocks } from "@/app/actions/actions";
 
 const Watchlist = async () => {
-  const session = await auth();
-
-  const myWatchlists = await prisma.watchlist.findMany({
-    where: { userId: session?.user?.id },
-    include: {
-      stocks: true,
-    },
-  });
-
-  // console.log("My stocks", myWatchlists);
-
-  const portfolioStocks = myWatchlists.filter(
-    (watchlist) => watchlist.watchListType === "portfolio"
-  )[0]?.stocks;
-
-  const generalStocks = myWatchlists.filter(
-    (watchlist) => watchlist.watchListType === "general"
-  )[0]?.stocks;
-
-  // const portfolioStockData = await subscribeToWatchlist(portfolioStocks);
-  // const generalStockData = await subscribeToWatchlist(generalStocks);
-  // console.log("Portfolio stocks", portfolioStockData);
-  // console.log("General stocks", generalStockData);
+  const { portfolioStocks, generalStocks } = await getStocks();
 
   // unsubscribeFromWatchlist(portfolioStocks);
   // unsubscribeFromWatchlist(generalStocks);
