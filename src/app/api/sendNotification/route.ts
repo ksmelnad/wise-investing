@@ -18,6 +18,7 @@ export async function GET() {
       where: { telegramChatId: { not: null } },
       include: {
         watchlists: {
+          where: { watchListType: "portfolio" },
           include: {
             stocks: true, // Fetch stocks for each watchlist
           },
@@ -47,17 +48,27 @@ export async function GET() {
 
                 const currentPrice = quote.regularMarketPrice;
                 const changePercent =
-                  ((currentPrice - (stock.purchasePrice || currentPrice)) /
-                    (stock.purchasePrice || currentPrice)) *
+                  ((currentPrice - stock.purchasePrice!) /
+                    stock.purchasePrice!) *
                   100;
 
                 if (Math.abs(changePercent) >= 3) {
-                  return `
+                  if (
+                    Math.floor(stock.lastNotifiedPercent!) !==
+                    Math.floor(changePercent)
+                  ) {
+                    await prisma.stock.update({
+                      where: { id: stock.id },
+                      data: { lastNotifiedPercent: changePercent },
+                    });
+
+                    return `
 📈 ${stock.symbol}:
 - Name: ${stock.name}
 - Purchase Price: $${stock.purchasePrice?.toFixed(2) || "N/A"}
 - Current Price: $${currentPrice.toFixed(2)}
 - Change: ${changePercent.toFixed(2)}%`;
+                  }
                 }
                 return null;
               } catch (err) {

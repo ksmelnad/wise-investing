@@ -27,7 +27,7 @@ export async function createDefaultWatchlists() {
     ],
   });
 
-  console.log(result);
+  return result;
 }
 
 export async function getWatchlist() {
@@ -73,9 +73,9 @@ export async function addStockToWatchlist({
       where: { userId, watchListType: watchlistType },
     });
 
-    if (!watchlist) {
-      createDefaultWatchlists();
-    }
+    // if (!watchlist) {
+    //   createDefaultWatchlists();
+    // }
 
     // TODO: If stock already exists, dont add
 
