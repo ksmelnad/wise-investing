@@ -1,17 +1,23 @@
 "use client";
+
 import { useState } from "react";
 import axios from "axios";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
+import { addStockToWatchlist } from "@/app/actions/actions";
+import { useToast } from "@/hooks/use-toast";
+
+// shadcn/ui components
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogDescription,
   DialogFooter,
+  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
 import {
@@ -19,189 +25,200 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { addStockToWatchlist } from "@/app/actions/actions";
-import { useToast } from "@/hooks/use-toast";
 
 interface Stock {
   symbol: string;
   name: string;
   type: number;
 }
-const AddStock = () => {
-  const [searchResultPopup, setSearchResultPopup] = useState(false);
-  const [symbol, setSymbol] = useState("");
-  const [stockData, setStockData] = useState<Stock[] | []>([]);
-  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
-  const [selectedWatchlist, setSelectedWatchlist] = useState<string>("general");
-  const [selectedStockPurchasePrice, setSelectedStockPurchasePrice] =
-    useState<string>("");
-  const [purchasePriceError, setPurchasePriceError] = useState<string>("");
 
+const addStockSchema = z.object({
+  symbol: z.string().min(1, { message: "Symbol is required" }),
+  name: z.string().optional(),
+  purchasePrice: z.coerce
+    .number({ invalid_type_error: "Purchase Price must be a number" })
+    .positive("Purchase price must be a positive number")
+    .optional(),
+});
+
+type AddStockFormValues = z.infer<typeof addStockSchema>;
+
+interface AddStockProps {
+  watchlistName: string; // We receive this from the parent
+  onStockAdded?: () => void; // Callback if you want to trigger parent actions after adding
+}
+
+export function AddStock({ watchlistName, onStockAdded }: AddStockProps) {
   const { toast } = useToast();
 
-  const handleSearch = async () => {
-    // Implement search functionality here
-    console.log("Searching for symbol:", symbol);
+  // single symbol search
+  const [symbolSearchTerm, setSymbolSearchTerm] = useState("");
+  const [stockData, setStockData] = useState<Stock[]>([]);
+  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+
+  // react-hook-form instance
+  const form = useForm<AddStockFormValues>({
+    resolver: zodResolver(addStockSchema),
+    defaultValues: {
+      symbol: "",
+      purchasePrice: undefined,
+    },
+  });
+
+  // 1. Search for a single symbol
+  const handleSearchSymbol = async () => {
     try {
       const response = await axios.get(
-        `https://marketplace.financialmodelingprep.com/public/search?query=${symbol}`
+        `https://marketplace.financialmodelingprep.com/public/search?query=${symbolSearchTerm}`
       );
-      const data = response.data;
-      const { stock } = data;
+      const { stock } = response.data;
       setStockData(stock);
-      // console.log(data);
     } catch (error) {
       console.error("Error fetching stock data:", error);
+      setStockData([]);
     }
   };
 
-  // const handleYSearch = async () => {
-  //   const results = await getStockData("TSLA");
-  //   console.log(results);
-  // };
+  // 2. When user selects "Add" from the popover, open a Dialog with that stock
+  const handleSelectStock = (stock: Stock) => {
+    setSelectedStock(stock);
+    form.setValue("symbol", stock.symbol);
+    form.setValue("name", stock.name);
+  };
 
-  const handleAddStock = async (event: React.FormEvent) => {
-    event.preventDefault();
+  // 3. Submit the form -> calls addStockToWatchlist
+  const onSubmit = async (values: AddStockFormValues) => {
+    if (!selectedStock) return;
 
-    if (selectedStock) {
-      try {
-        if (isNaN(Number(selectedStockPurchasePrice))) {
-          setPurchasePriceError("Purchase price must be a number");
-          return;
-        }
-        setPurchasePriceError("");
-        const response = await addStockToWatchlist({
-          symbol: selectedStock.symbol,
-          name: selectedStock.name,
-          watchlistType: selectedWatchlist,
-          purchasePrice: Number(selectedStockPurchasePrice),
-        });
+    try {
+      const response = await addStockToWatchlist({
+        symbol: values.symbol,
+        stockName: values.name || "",
+        watchlistName, // from props
+        purchasePrice: values.purchasePrice,
+      });
 
-        if (response.success === true) {
-          toast({
-            description: response.message,
-          });
-        } else {
-          toast({
-            variant: "destructive",
-
-            description: response.message,
-          });
-        }
-      } catch (error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Something went wrong",
-        });
+      if (response.success) {
+        toast({ description: response.message });
+        onStockAdded?.(); // optional callback
+      } else {
+        toast({ variant: "destructive", description: response.message });
       }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Something went wrong",
+      });
     }
   };
 
   return (
-    <div className="relative">
-      <div className="">
-        <h3 className="font-bold text-lg mb-2 pt-4">Search Stock</h3>
-        <div className="flex items-center justify-between mb-4 gap-x-2 w-[400px]">
-          <Input
-            id="search"
-            placeholder="Ex. AAPL"
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value)}
-          />
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button type="submit" onClick={handleSearch}>
-                Search
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[400px]" align="end">
-              {stockData &&
-                stockData.length > 0 &&
-                stockData.map((stock, index) => (
-                  <div key={index} className="flex justify-between gap-2">
-                    <div className="flex flex-col mb-2">
-                      <span className="font-bold text-sm">{stock.symbol}</span>
-                      <span className="text-sm">{stock.name}</span>
-                    </div>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          onClick={() => setSelectedStock(stock)}
-                        >
-                          Add
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Add stock</DialogTitle>
-                          <DialogDescription>
-                            Add stock to your watchlist.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                          <h3 className="font-bold">{stock.symbol}</h3>
-                          <p className="text-sm">{stock.name}</p>
-                        </div>
-                        <RadioGroup
-                          value={selectedWatchlist}
-                          onValueChange={setSelectedWatchlist}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="general" id="r2" />
-                            <Label htmlFor="r2">General</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="portfolio" id="r1" />
-                            <Label htmlFor="r1">Portfolio</Label>
-                          </div>
-                        </RadioGroup>
-                        {selectedWatchlist === "portfolio" && (
-                          <div>
-                            <Label htmlFor="purchasePrice">
-                              Purchase Price
-                            </Label>
-                            <Input
-                              id="purchasePrice"
-                              // type="number"
-                              // step="0.01"
-                              value={selectedStockPurchasePrice}
-                              onChange={(e) =>
-                                setSelectedStockPurchasePrice(e.target.value)
-                              }
-                              placeholder="Purchase Price"
-                            />
-                            {purchasePriceError && (
-                              <p className="text-red-500">
-                                {purchasePriceError}
-                              </p>
-                            )}
-                          </div>
-                        )}
+    <div className="flex items-center gap-2">
+      <Input
+        placeholder="Ex. AAPL"
+        value={symbolSearchTerm}
+        onChange={(e) => setSymbolSearchTerm(e.target.value)}
+      />
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button onClick={handleSearchSymbol}>Search</Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[400px]" align="end">
+          {stockData?.length ? (
+            stockData.map((stock, index) => (
+              <div key={index} className="flex justify-between items-center">
+                <div className="flex flex-col mb-2">
+                  <span className="font-bold text-sm">{stock.symbol}</span>
+                  <span className="text-sm">{stock.name}</span>
+                </div>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleSelectStock(stock)}
+                    >
+                      Add
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add stock</DialogTitle>
+                      <DialogDescription>
+                        Add stock to your watchlist.
+                      </DialogDescription>
+                    </DialogHeader>
 
-                        <DialogFooter className="sm:justify-start">
-                          <DialogClose asChild>
-                            <Button onClick={(e) => handleAddStock(e)}>
-                              Add
-                            </Button>
-                          </DialogClose>
+                    {/* shadcn/ui Form example */}
+                    <Form {...form}>
+                      <form
+                        onSubmit={form.handleSubmit(onSubmit)}
+                        className="space-y-4"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="symbol"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Symbol</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Symbol"
+                                  {...field}
+                                  disabled
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        {/* Hidden field for name if needed */}
+                        <FormField
+                          control={form.control}
+                          name="purchasePrice"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Purchase Price (optional)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  placeholder="Purchase Price"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <DialogFooter>
+                          <Button type="submit">Confirm</Button>
                           <DialogClose asChild>
                             <Button variant="secondary">Close</Button>
                           </DialogClose>
                         </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                ))}
-            </PopoverContent>
-          </Popover>
-        </div>
-      </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            ))
+          ) : (
+            <p>No stocks found</p>
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
-};
-
-export default AddStock;
+}

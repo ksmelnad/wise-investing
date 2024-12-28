@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { type Watchlist as WatchlistPrismaType } from "@prisma/client";
+import prisma from "@/lib/prisma";
+import { Prisma, type Watchlist as WatchlistPrismaType } from "@prisma/client";
 import yahooFinance from "yahoo-finance2";
 
 import { auth } from "@/auth";
@@ -22,15 +22,37 @@ export async function createDefaultWatchlists() {
 
   const result = await prisma.watchlist.createMany({
     data: [
-      { userId, watchListType: "general" },
-      { userId, watchListType: "portfolio" },
+      { userId, name: "general" },
+      { userId, name: "portfolio" },
     ],
   });
 
   return result;
 }
 
-export async function getWatchlist() {
+export async function createWatchlist(name: string) {
+  const session = await auth();
+  const userEmail = session?.user?.email;
+  const user = await prisma.user.findFirst({
+    where: { email: userEmail },
+  });
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const userId = user.id;
+
+  const result = await prisma.watchlist.create({
+    data: { userId, name },
+  });
+
+  revalidatePath("/dashboard/watchlists");
+
+  return result;
+}
+
+export async function getUserWatchlists() {
   const session = await auth();
   const userEmail = session?.user?.email;
   const user = await prisma.user.findFirst({
@@ -42,18 +64,22 @@ export async function getWatchlist() {
   }
   return await prisma.watchlist.findMany({
     where: { userId: user.id },
+    include: {
+      stocks: true,
+    },
   });
 }
 
 export async function addStockToWatchlist({
   symbol,
-  name,
-  watchlistType,
+
+  stockName,
+  watchlistName,
   purchasePrice,
 }: {
-  watchlistType: string;
   symbol: string;
-  name: string;
+  stockName: string;
+  watchlistName: string;
   purchasePrice?: number;
 }) {
   try {
@@ -70,22 +96,17 @@ export async function addStockToWatchlist({
     }
 
     const watchlist = await prisma.watchlist.findFirst({
-      where: { userId, watchListType: watchlistType },
+      where: { userId, name: watchlistName },
     });
-
-    // if (!watchlist) {
-    //   createDefaultWatchlists();
-    // }
 
     // TODO: If stock already exists, dont add
 
-    if (watchlistType === "portfolio") {
+    if (watchlistName === "general") {
       const stockCreate = await prisma.stock.create({
         data: {
           watchlistId: watchlist?.id as string,
           symbol,
-          name,
-          purchasePrice,
+          name: stockName,
         },
       });
     } else {
@@ -93,7 +114,8 @@ export async function addStockToWatchlist({
         data: {
           watchlistId: watchlist?.id as string,
           symbol,
-          name,
+          name: stockName,
+          purchasePrice,
         },
       });
     }
@@ -142,11 +164,11 @@ export async function getStocks() {
   });
 
   const portfolioStocks = myWatchlists.filter(
-    (watchlist: WatchlistPrismaType) => watchlist.watchListType === "portfolio"
+    (watchlist: WatchlistPrismaType) => watchlist.name === "portfolio"
   )[0]?.stocks;
 
   const generalStocks = myWatchlists.filter(
-    (watchlist: WatchlistPrismaType) => watchlist.watchListType === "general"
+    (watchlist: WatchlistPrismaType) => watchlist.name === "general"
   )[0]?.stocks;
 
   return {
@@ -189,8 +211,24 @@ export async function removeStock(stockId: string) {
     };
   }
 }
-export async function getStockData(symbol: string) {
-  const results = await yahooFinance.quote(symbol);
 
-  return results;
+export async function moveStocksToWatchlist({
+  stockIds,
+  destinationWatchlistId,
+}: {
+  stockIds: string[];
+  destinationWatchlistId: string;
+}) {
+  if (!stockIds?.length || !destinationWatchlistId) return;
+
+  await prisma.stock.updateMany({
+    where: {
+      id: { in: stockIds },
+    },
+    data: {
+      watchlistId: destinationWatchlistId,
+    },
+  });
+
+  revalidatePath("/dashboard/watchlists");
 }

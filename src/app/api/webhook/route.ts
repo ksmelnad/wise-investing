@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import axios from "axios";
 import bot from "@/utils/tgBot";
 
@@ -56,6 +56,7 @@ bot.onText(/\/register (.+)/, async (msg, match) => {
 
     if (user) {
       // Update the chatId for the user
+      // NEED MORE SECURE WAY TO STORE CHATID
       if (!user.telegramChatId) {
         await prisma.user.update({
           where: { email },

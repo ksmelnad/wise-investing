@@ -1,285 +1,189 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
+// watchlist.ts
 
+import NodeCache from "node-cache";
+import { columns } from "@/components/columns";
+import { DataTable } from "@/components/data-table";
 import yahooFinance from "yahoo-finance2";
-import AddStock from "./dashboard/addStock";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
-import { Edit, Trash } from "lucide-react";
-import DelStockBtn from "./dashboard/delStockBtn";
-import { getStocks } from "@/app/actions/actions";
+import { AddStock } from "./dashboard/addStock";
+import { getUserWatchlists } from "@/app/actions/actions";
+import { AddManyStocks } from "./dashboard/addManyStocks";
+import { CreateWatchlist } from "./dashboard/createWatchlist";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Prisma, Watchlist as WatchlistType } from "@prisma/client";
+
+const CACHE_TTL = 30 * 60; // 5 minutes in seconds
+const stockCache = new NodeCache({ stdTTL: CACHE_TTL });
+
+/**
+ * The shape of the quote from Yahoo Finance.
+ */
+type StockQuote = {
+  regularMarketPrice?: number;
+  currency?: string;
+  marketCap?: number;
+  regularMarketChange?: number;
+  regularMarketChangePercent?: number;
+};
+
+/**
+ * Fetch a stock quote. In production, we skip the cache
+ * and fetch fresh data from yahooFinance. In dev, we
+ * attempt to return from cache, else fetch fresh.
+ */
+async function getStockQuote(symbol: string): Promise<StockQuote> {
+  const cacheKey = `stock_${symbol}`;
+
+  // In production, always fetch fresh data.
+  if (process.env.NODE_ENV === "production") {
+    return yahooFinance.quoteCombine(symbol);
+  }
+
+  // Otherwise, use caching in dev:
+  const cachedData = stockCache.get<StockQuote>(cacheKey);
+  if (cachedData) {
+    console.log(`[DEV] Using cached data for ${symbol}`);
+    return cachedData;
+  }
+
+  // Fetch fresh data and store in cache
+  console.log(`[DEV] Fetching fresh data for ${symbol}`);
+  try {
+    const quote = await yahooFinance.quoteCombine(symbol);
+    if (quote?.regularMarketPrice) {
+      stockCache.set(cacheKey, quote);
+    }
+    return quote;
+  } catch (error) {
+    console.error(`Error fetching ${symbol}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * This is the type we get back from Prisma (including the "stocks" relation).
+ */
+export type UserWatchlist = Prisma.WatchlistGetPayload<{
+  include: {
+    stocks: true;
+  };
+}>;
+
+/**
+ * Helper function to compute percent change from purchasePrice to currentPrice.
+ */
+function calculateChangePercent(
+  purchasePrice: number,
+  currentPrice: number
+): number {
+  const change = ((currentPrice - purchasePrice) / purchasePrice) * 100;
+  return Number(change.toFixed(2));
+}
+
+/**
+ * Helper function to compute absolute change from purchasePrice to currentPrice.
+ */
+function calculateChange(purchasePrice: number, currentPrice: number): number {
+  const change = currentPrice - purchasePrice;
+  return Number(change.toFixed(2));
+}
+
+/**
+ * Fetches watchlists from the DB, enriches with Yahoo Finance quotes,
+ * and returns the updated data.
+ */
+async function getProcessedWatchlists(): Promise<UserWatchlist[]> {
+  const watchlists = await getUserWatchlists();
+
+  const processedWatchlists = await Promise.all(
+    watchlists.map(async (watchlist) => {
+      // Enrich each stock
+      const updatedStocks = await Promise.all(
+        watchlist.stocks.map(async (stock) => {
+          const quote = await getStockQuote(stock.symbol);
+
+          // If there is no quote, keep it as-is to avoid errors
+          if (!quote) {
+            console.error(`Error fetching quote for ${stock.symbol}`);
+            return stock;
+          }
+
+          return {
+            ...stock,
+            currentPrice: quote.regularMarketPrice ?? null,
+            currency: quote.currency ?? null,
+            marketCap: quote.marketCap ?? null,
+            change: stock.purchasePrice
+              ? calculateChange(
+                  stock.purchasePrice,
+                  quote.regularMarketPrice ?? 0
+                )
+              : quote.regularMarketChange ?? null,
+            changePercent: stock.purchasePrice
+              ? calculateChangePercent(
+                  stock.purchasePrice,
+                  quote.regularMarketPrice ?? 0
+                )
+              : quote.regularMarketChangePercent ?? null,
+          };
+        })
+      );
+
+      // Return a new watchlist object with updated stocks
+      return {
+        ...watchlist,
+        stocks: updatedStocks,
+      };
+    })
+  );
+
+  return processedWatchlists;
+}
 
 const Watchlist = async () => {
-  const { portfolioStocks, generalStocks } = await getStocks();
+  // 1. Fetch + Enrich watchlist data
+  const processedWatchlists = await getProcessedWatchlists();
 
-  // unsubscribeFromWatchlist(portfolioStocks);
-  // unsubscribeFromWatchlist(generalStocks);
-
-  const currentPricesGeneralStocks = await Promise.all(
-    generalStocks.map(async (stock) => {
-      // const fields = ["regularMarketPrice", "regularMarketTime"] as const;
-      const quote = await yahooFinance.quoteCombine(stock.symbol);
-      // Populate generalStocks's current price with quote's regularMarketPrice
-      if (!quote) {
-        console.error(`Error fetching quote for ${stock.symbol}`);
-        return; // or throw an error, depending on your requirements
-      }
-      if (!quote.regularMarketPrice) {
-        console.error(`Missing regularMarketPrice field for ${stock.symbol}`);
-        return; // or throw an error, depending on your requirements
-      }
-      stock.currentPrice = quote.regularMarketPrice!;
-      stock.change = quote.regularMarketChange!;
-      stock.changePercent = quote.regularMarketChangePercent!;
-
-      // return quote;
-    })
-  );
-
-  const currentPricesPortfolioStocks = await Promise.all(
-    portfolioStocks.map(async (stock) => {
-      // const fields = ["regularMarketPrice", "regularMarketTime"] as const;
-      const quote = await yahooFinance.quoteCombine(stock.symbol);
-      if (!quote) {
-        console.error(`Error fetching quote for ${stock.symbol}`);
-        return; // or throw an error, depending on your requirements
-      }
-      if (!quote.regularMarketPrice) {
-        console.error(`Missing regularMarketPrice field for ${stock.symbol}`);
-        return; // or throw an error, depending on your requirements
-      }
-
-      stock.currentPrice = quote.regularMarketPrice!;
-    })
-  );
-
-  const calculateChangePercent = (
-    purchasePrice: number,
-    currentPrice: number
-  ) => {
-    const change = ((currentPrice - purchasePrice) / purchasePrice) * 100;
-    return change.toFixed(2);
-  };
-
-  const calculateChange = (purchasePrice: number, currentPrice: number) => {
-    const change = currentPrice - purchasePrice;
-    return Number(change.toFixed(2));
-  };
-
+  // 2. Return UI, using newly populated data
   return (
-    <section className="max-w-5xl mx-auto ">
-      <div>
-        <AddStock />
-        <Card>
-          <CardHeader>
-            <h3 className="text-lg font-semibold">Portfolio Watchlist</h3>
-            <p className="text-sm">
-              Your purchased stocks and their performance
-            </p>
-          </CardHeader>
-          <CardContent className="">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-bold p-2">Ticker</TableHead>
-                  <TableHead className="font-bold p-2">Company Name</TableHead>
-                  <TableHead className="font-bold p-2">
-                    Purchase Price
-                  </TableHead>
-                  <TableHead className="font-bold p-2">Current Price</TableHead>
-                  <TableHead className="font-bold p-2">Change</TableHead>
-                  <TableHead className="font-bold p-2">Change %</TableHead>
-                  <TableHead className="font-bold p-2">Edit</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {portfolioStocks.map((stock, index) => (
-                  <TableRow key={index} className="hover:bg-gray-100">
-                    <TableCell className="p-2">{stock.symbol}</TableCell>
-                    <TableCell className="p-2">{stock.name}</TableCell>
-                    <TableCell className="p-2 text-green-600">
-                      ${stock.purchasePrice}
-                    </TableCell>
-                    <TableCell className="p-2">${stock.currentPrice}</TableCell>
-                    <TableCell
-                      className={`p-2 ${
-                        calculateChange(
-                          stock.purchasePrice as number,
-                          stock.currentPrice as number
-                        ) < 0
-                          ? "text-red-600"
-                          : "text-green-600"
-                      }`}
-                    >
-                      {calculateChange(
-                        stock.purchasePrice as number,
-                        stock.currentPrice as number
-                      )}
-                    </TableCell>
-                    <TableCell className="p-2">
-                      {calculateChangePercent(
-                        stock.purchasePrice as number,
-                        stock.currentPrice as number
-                      )}
-                    </TableCell>
+    <section className="max-w-7xl mx-auto">
+      <div className="container mx-auto py-4">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Your Watchlists</h2>
+          <CreateWatchlist />
+        </div>
 
-                    <TableCell className="p-2 flex items-center gap-2 ">
-                      <Edit size={16} color="purple" />
-                      <Dialog>
-                        <DialogTrigger>
-                          <Trash size={16} color="red" />
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Delete stock</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to delete this stock?
-                            </DialogDescription>
-                          </DialogHeader>
-                          <h3 className="font-bold">{stock.symbol}</h3>
-                          <p>{stock.name}</p>
-                          <DialogFooter>
-                            <DialogClose asChild>
-                              <Button type="button" variant="secondary">
-                                Close
-                              </Button>
-                            </DialogClose>
+        <Tabs
+          defaultValue={processedWatchlists[0]?.id ?? "portfolio"}
+          className="w-full"
+        >
+          <TabsList className="mb-4">
+            {processedWatchlists.map((list) => (
+              <TabsTrigger key={list.id} value={list.id}>
+                {list.name.charAt(0).toUpperCase() + list.name.slice(1)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-                            <DialogClose asChild>
-                              <DelStockBtn stockId={stock.id} />
-                            </DialogClose>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-          <CardFooter className="flex flex-col"></CardFooter>
-        </Card>
-        <Card className="mt-4">
-          <CardHeader>
-            <h3 className="text-lg font-semibold">General Watchlist</h3>
-            <p className="text-sm">Your general stocks and their performance</p>
-          </CardHeader>
-          <CardContent>
-            <Table className="w-full text-left border-collapse">
-              <TableHeader className="bg-gray-50">
-                <TableRow>
-                  <TableHead className="font-bold p-2">Ticker</TableHead>
-                  <TableHead className="font-bold p-2">Company Name</TableHead>
-
-                  <TableHead className="font-bold p-2">Current Price</TableHead>
-                  <TableHead className="font-bold p-2">Change</TableHead>
-                  <TableHead className="font-bold p-2">Change %</TableHead>
-                  <TableHead className="font-bold p-2">Edit</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {generalStocks.map((stock, index) => (
-                  <TableRow key={index} className="hover:bg-gray-100">
-                    <TableCell className="p-2">{stock.symbol}</TableCell>
-                    <TableCell className="p-2">{stock.name}</TableCell>
-
-                    <TableCell className="p-2">
-                      ${stock.currentPrice?.toFixed(2)}
-                    </TableCell>
-
-                    <TableCell
-                      className={`p-2 
-                      ${
-                        stock.change
-                          ? stock.change < 0
-                            ? "text-red-600"
-                            : "text-green-600"
-                          : ""
-                      }
-                    `}
-                    >
-                      {stock.change?.toFixed(2)}
-                    </TableCell>
-                    <TableCell
-                      className={`p-2 
-                      ${
-                        stock.changePercent
-                          ? stock.changePercent < 0
-                            ? "text-red-600"
-                            : "text-green-600"
-                          : ""
-                      }
-                    `}
-                    >
-                      {stock.changePercent?.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="p-2 ">
-                      <Dialog>
-                        <DialogTrigger>
-                          <Trash size={16} color="red" />
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Delete stock</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to delete this stock?
-                            </DialogDescription>
-                          </DialogHeader>
-                          <h3 className="font-bold">{stock.symbol}</h3>
-                          <p>{stock.name}</p>
-                          <DialogFooter>
-                            <DialogClose asChild>
-                              <Button type="button" variant="secondary">
-                                Close
-                              </Button>
-                            </DialogClose>
-
-                            <DialogClose asChild>
-                              <DelStockBtn stockId={stock.id} />
-                            </DialogClose>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-          {/* <CardFooter className="flex justify-end p-4 bg-gray-50 border-t">
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              View Detailed Report
-            </Button>
-          </CardFooter> */}
-        </Card>
+          {processedWatchlists.map((list) => (
+            <TabsContent key={list.id} value={list.id}>
+              <div className="flex flex-col gap-y-4">
+                <div className="flex gap-x-4">
+                  <AddStock watchlistName={list.name} />
+                  <AddManyStocks watchlistName={list.name} />
+                </div>
+                {/* 
+                  Here, we pass in the updated stocks (enriched with 
+                  currentPrice, change, changePercent, etc.). 
+                */}
+                <DataTable
+                  columns={columns}
+                  data={list.stocks}
+                  watchlists={processedWatchlists}
+                />
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
       </div>
     </section>
   );

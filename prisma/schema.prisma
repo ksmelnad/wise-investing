@@ -78,8 +78,9 @@ model Watchlist {
 
   userId String @db.ObjectId
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  watchListType String 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name String 
   stocks        Stock[]
 }
 
@@ -89,6 +90,8 @@ model Stock {
   watchlist     Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
   symbol        String
   name          String
+  currency      String?
+  marketCap    Float?
   purchasePrice Float? // Optional for general watchlist
   currentPrice  Float?
   change        Float?

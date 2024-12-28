@@ -1,9 +1,11 @@
 import { auth } from "@/auth";
-import CreateDefaultWatchlistBtn from "@/components/dashboard/createDefaultWatchlistBtn";
-import Watchlist from "@/components/watchlist";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { createDefaultWatchlists, getStocks } from "../actions/actions";
+import {
+  createDefaultWatchlists,
+  getStocks,
+  getUserWatchlists,
+} from "../actions/actions";
 import {
   Card,
   CardContent,
@@ -19,41 +21,48 @@ const DashboardPage = async () => {
     redirect("/api/auth/signin");
   }
 
-  const existingWatchlist = await prisma.watchlist.findFirst({
-    where: {
-      user: {
-        email: session.user.email,
-      },
-    },
-  });
+  // const existingWatchlist = await prisma.watchlist.findFirst({
+  //   where: {
+  //     user: {
+  //       email: session.user.email,
+  //     },
+  //   },
+  // });
 
-  if (!existingWatchlist) {
-    const result = await createDefaultWatchlists();
-  }
+  // if (!existingWatchlist) {
+  //   const result = await createDefaultWatchlists();
+  // }
 
-  const { portfolioStocks, generalStocks } = await getStocks();
+  const watchlists = await getUserWatchlists();
 
   return (
     <div className="">
       <h2 className="text-2xl font-bold mb-10">Welcome {session.user.name}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Portfolio Stocks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <h2 className="text-5xl font-bold">{portfolioStocks.length}</h2>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>General Stocks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <h2 className="text-5xl font-bold">{generalStocks.length}</h2>
-          </CardContent>
-        </Card>
-      </div>
+      {watchlists.length !== 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {watchlists.map((watchlist) => (
+            <Card key={watchlist.id}>
+              <CardHeader>
+                <CardTitle>
+                  {watchlist.name.charAt(0).toUpperCase() +
+                    watchlist.name.slice(1)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <h2 className="text-5xl font-bold">
+                  {watchlist.stocks.length}
+                </h2>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div>
+          <p className="text-2xl font-bold">
+            You have no watchlists. Create one to get started.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

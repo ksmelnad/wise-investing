@@ -1,6 +1,6 @@
 import TelegramBot from "node-telegram-bot-api";
 import yahooFinance from "yahoo-finance2";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 
@@ -18,7 +18,7 @@ export async function GET() {
       where: { telegramChatId: { not: null } },
       include: {
         watchlists: {
-          where: { watchListType: "portfolio" },
+          where: { name: "portfolio" },
           include: {
             stocks: true, // Fetch stocks for each watchlist
           },
@@ -83,7 +83,7 @@ export async function GET() {
 
           if (validStockMessages.length > 0) {
             return `
-===== Watchlist: ${watchlist.watchListType} =====
+===== Watchlist: ${watchlist.name} =====
 ${validStockMessages.join("\n")}`;
           }
           return null;
